@@ -1,9 +1,9 @@
 # ray/_private/accelerators/mblt.py
+import glob
+import logging
 import os
 import re
-import glob
 import subprocess
-import logging
 from typing import Dict, List, Optional, Tuple
 
 from ray._private.accelerators.accelerator import AcceleratorManager
@@ -14,8 +14,9 @@ MBLT_VISIBLE_DEVICES = "MBLT_VISIBLE_DEVICES"
 NOSET_MBLT_VISIBLE_DEVICES = "RAY_EXPERIMENTAL_NOSET_MBLT_VISIBLE_DEVICES"
 
 # OS 폴백 힌트
-_MBLT_DEV_GLOB = "/dev/aries[0-9]*"       # manipulate /dev/mblt[0-9]* following environments
+_MBLT_DEV_GLOB = "/dev/aries[0-9]*"  # manipulate /dev/mblt[0-9]* following environments
 _MBLT_PCI_FILTER = ["lspci", "-d", "209f:", "-nn"]  # 0x209f = Mobilint
+
 
 class MBLTAcceleratorManager(AcceleratorManager):
     """Mobilint MBLT NPU support. Policy: only MBLT=1 per task/actor."""
@@ -32,6 +33,7 @@ class MBLTAcceleratorManager(AcceleratorManager):
     def get_current_node_num_accelerators() -> int:
         try:
             from maccel.accelerator import Accelerator
+
             max_try = _hint_num_from_os() or 9
             count = 0
             for dev_no in range(max_try):
@@ -44,7 +46,9 @@ class MBLTAcceleratorManager(AcceleratorManager):
             if count > 0:
                 return count
         except Exception as e:
-            logger.debug("maccel import failed in get_current_node_num_accelerators: %s", e)
+            logger.debug(
+                "maccel import failed in get_current_node_num_accelerators: %s", e
+            )
 
         try:
             devs = glob.glob(_MBLT_DEV_GLOB)
@@ -66,8 +70,15 @@ class MBLTAcceleratorManager(AcceleratorManager):
     def get_current_node_accelerator_type() -> Optional[str]:
         try:
             from maccel.accelerator import Accelerator
+
             acc = Accelerator(0)
-            for attr in ("get_device_name", "get_name", "get_model", "get_chip_name", "device_name"):
+            for attr in (
+                "get_device_name",
+                "get_name",
+                "get_model",
+                "get_chip_name",
+                "device_name",
+            ):
                 if hasattr(acc, attr):
                     try:
                         val = getattr(acc, attr)()
@@ -79,7 +90,9 @@ class MBLTAcceleratorManager(AcceleratorManager):
             pass
 
         try:
-            out = subprocess.check_output(_MBLT_PCI_FILTER, text=True, stderr=subprocess.DEVNULL).strip()
+            out = subprocess.check_output(
+                _MBLT_PCI_FILTER, text=True, stderr=subprocess.DEVNULL
+            ).strip()
             line = out.splitlines()[0] if out else ""
             if not line:
                 return None
@@ -124,7 +137,9 @@ def _hint_num_from_os() -> Optional[int]:
     except Exception:
         pass
     try:
-        out = subprocess.check_output(_MBLT_PCI_FILTER, text=True, stderr=subprocess.DEVNULL).strip()
+        out = subprocess.check_output(
+            _MBLT_PCI_FILTER, text=True, stderr=subprocess.DEVNULL
+        ).strip()
         if out:
             return len(out.splitlines())
     except Exception:

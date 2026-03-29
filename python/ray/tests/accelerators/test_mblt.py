@@ -4,14 +4,21 @@ import sys
 from unittest.mock import patch
 
 import pytest
+
 import ray
 from ray._private.accelerators import MBLTAcceleratorManager as Accelerator
+
 
 def _inject_mock_mblt(num_devices: int, *, install=True):
     import importlib
     import types
-    mock = importlib.import_module("tests.mock_mblt") if "tests.mock_mblt" in sys.modules else importlib.import_module("mock_mblt")
-    setattr(mock, "NUM_DEVICES", num_devices)
+
+    mock = (
+        importlib.import_module("tests.mock_mblt")
+        if "tests.mock_mblt" in sys.modules
+        else importlib.import_module("mock_mblt")
+    )
+    mock.NUM_DEVICES = num_devices
 
     maccel_pkg = types.ModuleType("maccel")
     accel_mod = types.ModuleType("maccel.accelerator")
@@ -32,6 +39,7 @@ def test_autodetect_num_mblt_devices():
 def test_autodetect_num_mblt_devices_without_any():
     with patch.dict(sys.modules, clear=False):
         import types
+
         maccel_pkg = types.ModuleType("maccel")
         accel_mod = types.ModuleType("maccel.accelerator")
 
@@ -55,8 +63,11 @@ def test_mblt_accelerator_manager_api():
 
 
 def test_visible_mblt_type(monkeypatch, shutdown_only):
-    with patch.object(Accelerator, "get_current_node_num_accelerators", return_value=4), \
-         patch.object(Accelerator, "get_current_node_accelerator_type", return_value="ARIES"):
+    with patch.object(
+        Accelerator, "get_current_node_num_accelerators", return_value=4
+    ), patch.object(
+        Accelerator, "get_current_node_accelerator_type", return_value="ARIES"
+    ):
         monkeypatch.setenv("MBLT_VISIBLE_DEVICES", "0,1,2")
         manager = ray._private.accelerators.get_accelerator_manager_for_resource("MBLT")
         assert manager.get_current_node_accelerator_type() == "ARIES"
@@ -72,9 +83,13 @@ def test_visible_mblt_ids(monkeypatch, shutdown_only):
         _inject_mock_mblt(num_devices=4)
         monkeypatch.setenv("MBLT_VISIBLE_DEVICES", "0,1,2")
 
-        with patch.object(Accelerator, "get_current_node_num_accelerators", return_value=4):
+        with patch.object(
+            Accelerator, "get_current_node_num_accelerators", return_value=4
+        ):
             ray.init()
-            manager = ray._private.accelerators.get_accelerator_manager_for_resource("MBLT")
+            manager = ray._private.accelerators.get_accelerator_manager_for_resource(
+                "MBLT"
+            )
             assert manager.get_current_node_num_accelerators() == 4
             assert manager.__name__ == "MBLTAcceleratorManager"
             assert ray.available_resources()["MBLT"] == 3  # visible 3개
@@ -113,7 +128,9 @@ def test_set_current_process_visible_accelerator_ids(shutdown_only):
 def test_auto_detected_more_than_visible(monkeypatch, shutdown_only):
     with patch.dict(sys.modules, clear=False):
         _inject_mock_mblt(num_devices=4)
-        with patch.object(Accelerator, "get_current_node_num_accelerators", return_value=4):
+        with patch.object(
+            Accelerator, "get_current_node_num_accelerators", return_value=4
+        ):
             monkeypatch.setenv("MBLT_VISIBLE_DEVICES", "0,1,2")
             ray.init()
             assert ray.available_resources()["MBLT"] == 3
